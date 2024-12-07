@@ -138,13 +138,18 @@ public class P5_Fulgent_Blade : SplatoonScript
                 _state = State.Stack;
             }
         }
+        
+        if (set.Action.Value.RowId == 40310)
+        {
+            _state = State.End;
+        }
     }
 
     public override void OnUpdate()
     {
         if (_state is State.None or State.End) Controller.GetRegisteredElements().Each(x => x.Value.Enabled = false);
         else
-            Controller.GetRegisteredElements().Each(x => x.Value.Enabled = true);
+            Controller.GetRegisteredElements().Each(x => x.Value.color = GradientColor.Get(C.BaitColor1, C.BaitColor2).ToUint());
         if (_state == State.Start && _bladePositions.Count() != 6)
         {
             foreach (var blade in Blades)
@@ -168,6 +173,7 @@ public class P5_Fulgent_Blade : SplatoonScript
                     _isMirror = true;
                 else if (excluded.Contains(Direction.South) && excluded.Contains(Direction.SouthWest))
                     _isMirror = true;
+                else _isMirror = false;
                 
                 DrawStartPosition();
             }
@@ -192,7 +198,7 @@ public class P5_Fulgent_Blade : SplatoonScript
 
         return _safeDirection switch
         {
-            Direction.North => center + new Vector2(_isMirror ? -offset.X : offset.X, -offset.Y),
+            Direction.North => center + new Vector2(_isMirror ? offset.X : -offset.X, -offset.Y),
             Direction.East => center + new Vector2(offset.Y, _isMirror ? -offset.X : offset.X),
             Direction.South => center + new Vector2(_isMirror ? -offset.X : offset.X, offset.Y),
             Direction.West => center + new Vector2(-offset.Y, _isMirror ? -offset.X : offset.X),
@@ -234,7 +240,7 @@ public class P5_Fulgent_Blade : SplatoonScript
     public void DrawStack()
     {
         _isMirror = C.StackIsLeft;
-        var position = CalculatePosition(new Vector2(-5, 5)); 
+        var position = CalculatePosition(new Vector2(4, 5)); 
         if (Controller.TryGetElementByName("Safe", out var safe))
         {
             safe.Enabled = true;
