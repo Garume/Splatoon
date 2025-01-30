@@ -6,6 +6,7 @@ using Dalamud.Game.ClientState.Objects.SubKinds;
 using ECommons;
 using ECommons.Configuration;
 using ECommons.GameFunctions;
+using ECommons.GameHelpers;
 using ECommons.Hooks.ActionEffectTypes;
 using ECommons.ImGuiMethods;
 using ECommons.Logging;
@@ -78,14 +79,13 @@ public class P2_Light_Rampant_JP : SplatoonScript
 
             var direction = C.Directions[count];
 
-            DuoLog.Warning($"Direction: {direction} Count: {count}");
             const float radius = 16f;
             var center = new Vector2(100f, 100f);
             var angle = (int)direction;
             var x = center.X + radius * MathF.Cos(angle * MathF.PI / 180);
             var y = center.Y + radius * MathF.Sin(angle * MathF.PI / 180);
 
-            if (Controller.TryGetElementByName("Bait", out var bait))
+            if (!_aoeTargets.Contains(Player.Name) && Controller.TryGetElementByName("Bait", out var bait))
             {
                 bait.Enabled = true;
                 bait.SetOffPosition(new Vector3(x, 0, y));
