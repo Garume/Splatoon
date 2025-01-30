@@ -73,6 +73,7 @@ public class P2_Light_Rampant_JP : SplatoonScript
                 if (C.PlayersCount == 1 && C.PriorityData1.GetPlayer(x => x.Name == aoeTarget) is not null) count++;
                 if (C.PlayersCount == 2 && C.PriorityData2.GetPlayer(x => x.Name == aoeTarget) is not null) count++;
                 if (C.PlayersCount == 3 && C.PriorityData3.GetPlayer(x => x.Name == aoeTarget) is not null) count++;
+                if (C.PlayersCount == 4 && C.PriorityData4.GetPlayer(x => x.Name == aoeTarget) is not null) count++;
             }
 
             var direction = C.Directions[count];
@@ -128,7 +129,7 @@ public class P2_Light_Rampant_JP : SplatoonScript
 
     public override void OnSettingsDraw()
     {
-        ImGui.SliderInt("Players Count", ref C.PlayersCount, 0, 3);
+        ImGui.SliderInt("Players Count", ref C.PlayersCount, 0, 4);
         
         switch (C.PlayersCount)
         {
@@ -140,6 +141,9 @@ public class P2_Light_Rampant_JP : SplatoonScript
                 break;
             case 3:
                 C.PriorityData3.Draw();
+                break;
+            case 4:
+                C.PriorityData4.Draw();
                 break;
         }
         
@@ -185,6 +189,14 @@ public class P2_Light_Rampant_JP : SplatoonScript
             return 3;
         }
     }
+    
+    public class PriorityData4 : PriorityData
+    {
+        public override int GetNumPlayers()
+        {
+            return 4;
+        }
+    }
 
     public class Config : IEzConfig
     {
@@ -201,6 +213,7 @@ public class P2_Light_Rampant_JP : SplatoonScript
         public PriorityData1 PriorityData1 = new();
         public PriorityData2 PriorityData2 = new();
         public PriorityData3 PriorityData3 = new();
+        public PriorityData4 PriorityData4 = new();
         
         public int PlayersCount = 2;
     }
