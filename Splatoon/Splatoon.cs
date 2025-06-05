@@ -6,6 +6,7 @@ using Dalamud.Game.Text.SeStringHandling;
 using Dalamud.Interface.ImGuiNotification;
 using Dalamud.Plugin.Services;
 using ECommons;
+using ECommons.Automation;
 using ECommons.Automation.NeoTaskManager;
 using ECommons.CircularBuffers;
 using ECommons.Configuration;
@@ -31,6 +32,7 @@ using Splatoon.Serializables;
 using Splatoon.SplatoonScripting;
 using Splatoon.Structures;
 using System.Net.Http;
+using System.Windows.Forms;
 using Colors = Splatoon.Utility.Colors;
 using Localization = ECommons.LanguageHelpers.Localization;
 
@@ -168,13 +170,17 @@ public unsafe class Splatoon : IDalamudPlugin
         StreamDetector.Start();
         AttachedInfo.Init();
         Logger.OnTerritoryChanged();
-        Layout.DisplayConditions = new string[] {
+        Layout.DisplayConditions = [
             "Always shown".Loc(),
             "Only in combat".Loc(),
             "Only in instance".Loc(),
             "Only in combat AND instance".Loc(),
             "Only in combat OR instance".Loc(),
-            "On trigger only".Loc() };
+            "On trigger only".Loc(),
+            "Outside of combat".Loc(),
+            "Outside of instance".Loc(),
+            "Outside of combat AND instance".Loc(),
+            "Outside of combat OR instance".Loc()];
         Element.Init();
         mapEffectProcessor = new();
         TetherProcessor = new();
@@ -660,9 +666,10 @@ public unsafe class Splatoon : IDalamudPlugin
 
     internal static void ProcessElementsOfLayout(Layout l)
     {
-        for(var i = 0; i < l.ElementsL.Count; i++)
+        var elementCollection = l.GetElementsWithSubconfiguration();
+        for(var i = 0; i < elementCollection.Count; i++)
         {
-            var element = l.ElementsL[i];
+            var element = elementCollection[i];
             if(element.Conditional && element.ConditionalReset) l.ConditionalStatus = null;
             var shouldSkip = l.ConditionalStatus == false && (l.ConditionalAnd || (!l.ConditionalAnd && l.ConditionalStatus == false && !element.Conditional));
             if(shouldSkip) continue;
@@ -715,7 +722,14 @@ public unsafe class Splatoon : IDalamudPlugin
             var mousePos = ImGui.GetIO().MousePos;
             if(Svc.GameGui.ScreenToWorld(new Vector2(mousePos.X, mousePos.Y), out var worldPos, Config.maxdistance * 5))
             {
-                s2wInfo.Apply(worldPos.X, worldPos.Z, worldPos.Y);
+                if(IsKeyPressed(Keys.LShiftKey) || IsKeyPressed(Keys.RShiftKey))
+                {
+                    s2wInfo.Apply(MathF.Round(worldPos.X), MathF.Round(worldPos.Z), MathF.Round(worldPos.Y));
+                }
+                else
+                {
+                    s2wInfo.Apply(worldPos.X, worldPos.Z, worldPos.Y);
+                }
             }
             if(!lmbdown && prevMouseState)
             {
