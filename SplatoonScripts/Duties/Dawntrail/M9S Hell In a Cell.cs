@@ -90,6 +90,7 @@ public class M9S_Hell_In_a_Cell : SplatoonScript
         C.PriorityData.Draw();
 
         ImGui.Checkbox("Spread Clockwise From Wide Gap", ref C.SpreadClockwiseFromWide);
+        ImGui.Checkbox("Tower Entry: Counter-Clockwise", ref C.TowerCounterClockwise);
         ImGui.Checkbox("Tower Order: narrow-gap base (2-3-4-1)", ref C.UseNarrowGapTowerOrder);
         
         ImGui.Text("Bait Color:");
@@ -109,6 +110,7 @@ public class M9S_Hell_In_a_Cell : SplatoonScript
             ImGui.BulletText("前半4人（0〜3番）＝ MT組 / 後半4人（4〜7番）＝ ST組");
             ImGui.BulletText("1回目（前半）は MT組が塔、2回目（後半）は ST組が塔");
             ImGui.BulletText("塔の割り当ては「北→時計回り」。塔担当4人の 1〜4番がその順で入ります");
+            ImGui.BulletText("反時計回りにしたい場合は「Tower Entry: Counter-Clockwise」をオンにしてください");
             ImGui.BulletText("散開（Spread）は「塔に入っていない側の4人」が動きます");
             ImGui.BulletText("散開側の1番目（後半ならMT組1番目）が『空き（いちばん広い塔間）』に入り、そこを北として時計回りに割り当てます");
             ImGui.BulletText("反時計回りにしたい場合はSpread Clockwise From Wide Gapのチェックを外してください");
@@ -126,6 +128,7 @@ public class M9S_Hell_In_a_Cell : SplatoonScript
             ImGui.BulletText("First 4 entries (0–3) = MT group / Last 4 entries (4–7) = ST group");
             ImGui.BulletText("1st set: MT group takes towers. 2nd set: ST group takes towers");
             ImGui.BulletText("Tower order is North → clockwise. Tower-side players #1–#4 take towers in that order");
+            ImGui.BulletText("To enter towers counter-clockwise from North, enable 'Tower Entry: Counter-Clockwise'");
             ImGui.BulletText("Spread is done by the non-tower group (the other 4 players)");
             ImGui.BulletText(
                 "For Spread: the #1 player of the spread-side group (in the 2nd set, MT #1) goes to the open gap (widest gap). That gap becomes 'North', then assignments go clockwise");
@@ -381,9 +384,20 @@ public class M9S_Hell_In_a_Cell : SplatoonScript
     
     private int TowerIdx(int role)
     {
-        if (!C.UseNarrowGapTowerOrder) return role;
-        var off = role switch { 0 => 3, 1 => 0, 2 => 1, 3 => 2, _ => 0 };
-        return (_narrowGapIndex + off) % 4;
+        int idx = role;
+
+        if (C.UseNarrowGapTowerOrder)
+        {
+            var off = role switch { 0 => 3, 1 => 0, 2 => 1, 3 => 2, _ => 0 };
+            idx = (_narrowGapIndex + off) % 4;
+        }
+
+        return ApplyDirection(idx);
+    }
+
+    private int ApplyDirection(int idx)
+    {
+        return C.TowerCounterClockwise ? (4 - idx) % 4 : idx;
     }
 
     private static Vector2 ToXz(Vector3 v)
@@ -463,6 +477,7 @@ public class M9S_Hell_In_a_Cell : SplatoonScript
         public PriorityData PriorityData = new();
         public bool SpreadClockwiseFromWide = true;
         public bool UseNarrowGapTowerOrder = false;
+        public bool TowerCounterClockwise = false;
     }
 
     private class Gap
