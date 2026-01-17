@@ -188,6 +188,7 @@ internal static class LayoutDrawSelector
                             CurrentLayout.GetElementsWithSubconfiguration()[indexOfMovedObj] = null;
                             CurrentLayout.GetElementsWithSubconfiguration().Insert(i, exch);
                             CurrentLayout.GetElementsWithSubconfiguration().RemoveAll(x => x == null);
+                            P.ConfigGui.MarkLayoutEdited();
                         }
                     }
                     ImGui.EndDragDropTarget();
@@ -199,6 +200,7 @@ internal static class LayoutDrawSelector
                     {
                         var l = layout.GetElementsWithSubconfiguration();
                         new TickScheduler(() => l.Remove(e));
+                        P.ConfigGui.MarkLayoutEdited();
                     }
                     ImGui.EndPopup();
                 }
@@ -209,6 +211,7 @@ internal static class LayoutDrawSelector
                 if(ImGui.SmallButton("Add element".Loc()))
                 {
                     layout.GetElementsWithSubconfiguration().Add(new(0));
+                    P.ConfigGui.MarkLayoutEdited();
                 }
                 ImGui.SameLine();
                 if(ImGui.SmallButton("Paste".Loc()))
@@ -216,6 +219,7 @@ internal static class LayoutDrawSelector
                     try
                     {
                         layout.GetElementsWithSubconfiguration().Add(JsonConvert.DeserializeObject<Element>(ImGui.GetClipboardText()));
+                        P.ConfigGui.MarkLayoutEdited();
                     }
                     catch(Exception e)
                     {
@@ -228,6 +232,7 @@ internal static class LayoutDrawSelector
                     try
                     {
                         layout.GetElementsWithSubconfiguration().Add(CurrentElement.DSFClone());
+                        P.ConfigGui.MarkLayoutEdited();
                     }
                     catch(Exception e)
                     {

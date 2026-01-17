@@ -3,6 +3,7 @@ using ECommons;
 using ECommons.ExcelServices;
 using ECommons.LanguageHelpers;
 using NightmareUI;
+using Newtonsoft.Json;
 using Splatoon.SplatoonScripting;
 using Splatoon.Structures;
 using TerraFX.Interop.Windows;
@@ -34,6 +35,14 @@ internal partial class CGui
     internal static string NewLayoytName = "";
     internal static Layout ScrollTo = null;
     internal LayoutFolder LayoutFolderStructure;
+    private const int LayoutUndoLimit = 10;
+    private readonly List<LayoutEditSnapshot> LayoutUndo = [];
+    private readonly List<LayoutEditSnapshot> LayoutRedo = [];
+    private LayoutEditSnapshot LayoutIdleSnapshot = null;
+    private LayoutEditSnapshot LayoutPendingBaseline = null;
+    private bool LayoutEditDirty = false;
+    private bool LayoutEditSessionActive = false;
+    private bool LayoutUndoApplying = false;
 
     private void BuildLayoutFolderStructure()
     {
@@ -195,6 +204,8 @@ internal partial class CGui
                 ImGui.BeginChild("LayoutsTableEdit", ImGui.GetContentRegionAvail(), false, ImGuiWindowFlags.HorizontalScrollbar);
                 if(CurrentLayout != null)
                 {
+                    HandleLayoutEditHotkeys();
+                    BeginLayoutEditFrame();
                     if(CurrentElement != null && CurrentLayout.GetElementsWithSubconfiguration().Contains(CurrentElement))
                     {
                         LayoutDrawElement(CurrentLayout, CurrentElement);
@@ -203,9 +214,11 @@ internal partial class CGui
                     {
                         LayoutDrawHeader(CurrentLayout);
                     }
+                    EndLayoutEditFrame();
                 }
                 else
                 {
+                    ResetLayoutEditTracking();
                     ImGuiEx.Text("UI Help:\n- Left panel contains groups, layouts and elements.\n- You can drag and drop layouts, elements and groups to reorder them.\n- Right click on a group to rename or delete it.\n- Right click on a layout/element to delete it.\n- Middle click on layout/element for quick enable/disable".Loc());
                 }
                 ImGui.EndChild();
@@ -475,6 +488,225 @@ internal partial class CGui
                 }
             }
         }
+    }
+
+    internal void MarkLayoutEdited()
+    {
+        if(LayoutUndoApplying) return;
+        LayoutEditDirty = true;
+    }
+
+    private void HandleLayoutEditHotkeys()
+    {
+        if(LayoutUndoApplying || CurrentLayout == null) return;
+        var io = ImGui.GetIO();
+        if(io.WantTextInput) return;
+        if(io.KeyCtrl)
+        {
+            if(io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.Z, false))
+            {
+                RedoLayoutEdit();
+                return;
+            }
+            if(ImGui.IsKeyPressed(ImGuiKey.Z, false))
+            {
+                UndoLayoutEdit();
+                return;
+            }
+            if(ImGui.IsKeyPressed(ImGuiKey.Y, false))
+            {
+                RedoLayoutEdit();
+            }
+        }
+    }
+
+    private void BeginLayoutEditFrame()
+    {
+        if(LayoutUndoApplying || CurrentLayout == null) return;
+        if(!ImGui.IsAnyItemActive())
+        {
+            LayoutIdleSnapshot = CaptureLayoutSnapshot(CurrentLayout);
+        }
+    }
+
+    private void EndLayoutEditFrame()
+    {
+        if(LayoutUndoApplying || CurrentLayout == null) return;
+        var anyActive = ImGui.IsAnyItemActive();
+        if(!LayoutEditSessionActive && anyActive)
+        {
+            LayoutEditSessionActive = true;
+            LayoutEditDirty = false;
+            LayoutPendingBaseline = LayoutIdleSnapshot ?? CaptureLayoutSnapshot(CurrentLayout);
+        }
+        if(ImGui.IsAnyItemEdited())
+        {
+            LayoutEditDirty = true;
+        }
+        if(LayoutEditSessionActive && !anyActive)
+        {
+            CommitLayoutEdit(LayoutPendingBaseline);
+            LayoutEditSessionActive = false;
+            LayoutEditDirty = false;
+            LayoutPendingBaseline = null;
+        }
+        else if(!anyActive && LayoutEditDirty && LayoutPendingBaseline == null)
+        {
+            CommitLayoutEdit(LayoutIdleSnapshot);
+            LayoutEditDirty = false;
+        }
+    }
+
+    private void CommitLayoutEdit(LayoutEditSnapshot baseline)
+    {
+        if(!LayoutEditDirty || baseline == null || CurrentLayout == null) return;
+        EnsureLayoutBaseline(baseline);
+        PushLayoutUndo(CaptureLayoutSnapshot(CurrentLayout));
+        LayoutRedo.Clear();
+    }
+
+    private void EnsureLayoutBaseline(LayoutEditSnapshot baseline)
+    {
+        if(baseline == null) return;
+        if(LayoutUndo.Count > 0)
+        {
+            var last = LayoutUndo[^1];
+            if(last.LayoutGuid == baseline.LayoutGuid && last.LayoutJson == baseline.LayoutJson)
+            {
+                return;
+            }
+        }
+        LayoutUndo.Add(baseline);
+        TrimLayoutUndo();
+    }
+
+    private void ResetLayoutEditTracking()
+    {
+        LayoutEditSessionActive = false;
+        LayoutEditDirty = false;
+        LayoutPendingBaseline = null;
+        LayoutIdleSnapshot = null;
+    }
+
+    private LayoutEditSnapshot CaptureLayoutSnapshot(Layout layout)
+    {
+        if(layout == null) return null;
+        var json = JsonConvert.SerializeObject(layout);
+        var list = layout.GetElementsWithSubconfiguration();
+        var index = CurrentElement == null ? -1 : list.IndexOf(CurrentElement);
+        return new LayoutEditSnapshot
+        {
+            LayoutGuid = layout.GUID,
+            LayoutJson = json,
+            SelectedElementIndex = index,
+            SelectedSubconfigGuid = layout.SelectedSubconfigurationID
+        };
+    }
+
+    private void PushLayoutUndo(LayoutEditSnapshot snapshot)
+    {
+        if(snapshot == null) return;
+        if(LayoutUndo.Count > 0)
+        {
+            var last = LayoutUndo[^1];
+            if(last.LayoutGuid == snapshot.LayoutGuid && last.LayoutJson == snapshot.LayoutJson)
+            {
+                return;
+            }
+        }
+        LayoutUndo.Add(snapshot);
+        TrimLayoutUndo();
+    }
+
+    private void TrimLayoutUndo()
+    {
+        while(LayoutUndo.Count > LayoutUndoLimit + 1)
+        {
+            LayoutUndo.RemoveAt(0);
+        }
+    }
+
+    private bool TryApplyLayoutSnapshot(LayoutEditSnapshot snapshot)
+    {
+        if(snapshot == null) return false;
+        if(!P.Config.LayoutsL.TryGetFirst(x => x.GUID == snapshot.LayoutGuid, out var layout))
+        {
+            return false;
+        }
+        var restored = JsonConvert.DeserializeObject<Layout>(snapshot.LayoutJson);
+        if(restored == null) return false;
+        restored.GUID = layout.GUID;
+        restored.Group = layout.Group;
+        restored.SelectedSubconfigurationID = snapshot.SelectedSubconfigGuid;
+        var index = P.Config.LayoutsL.IndexOf(layout);
+        if(index >= 0)
+        {
+            P.Config.LayoutsL[index] = restored;
+        }
+        if(CurrentLayout == layout)
+        {
+            CurrentLayout = restored;
+            if(snapshot.SelectedElementIndex >= 0)
+            {
+                var list = restored.GetElementsWithSubconfiguration();
+                CurrentElement = snapshot.SelectedElementIndex < list.Count ? list[snapshot.SelectedElementIndex] : null;
+            }
+            else
+            {
+                CurrentElement = null;
+            }
+        }
+        return true;
+    }
+
+    private bool CanUndoLayoutEdit() => LayoutUndo.Count > 1;
+    private bool CanRedoLayoutEdit() => LayoutRedo.Count > 0;
+
+    private void UndoLayoutEdit()
+    {
+        if(!CanUndoLayoutEdit()) return;
+        LayoutUndoApplying = true;
+        try
+        {
+            var current = LayoutUndo[^1];
+            LayoutUndo.RemoveAt(LayoutUndo.Count - 1);
+            LayoutRedo.Add(current);
+            while(LayoutUndo.Count > 0 && !TryApplyLayoutSnapshot(LayoutUndo[^1]))
+            {
+                LayoutUndo.RemoveAt(LayoutUndo.Count - 1);
+            }
+        }
+        finally
+        {
+            LayoutUndoApplying = false;
+            ResetLayoutEditTracking();
+        }
+    }
+
+    private void RedoLayoutEdit()
+    {
+        if(!CanRedoLayoutEdit()) return;
+        LayoutUndoApplying = true;
+        try
+        {
+            var snapshot = LayoutRedo[^1];
+            LayoutRedo.RemoveAt(LayoutRedo.Count - 1);
+            LayoutUndo.Add(snapshot);
+            TryApplyLayoutSnapshot(snapshot);
+        }
+        finally
+        {
+            LayoutUndoApplying = false;
+            ResetLayoutEditTracking();
+        }
+    }
+
+    private class LayoutEditSnapshot
+    {
+        public string LayoutGuid;
+        public string LayoutJson;
+        public int SelectedElementIndex;
+        public Guid SelectedSubconfigGuid;
     }
 
     internal static bool ImportFromClipboard()

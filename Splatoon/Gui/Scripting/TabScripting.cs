@@ -2,6 +2,7 @@
 using Dalamud.Interface.Components;
 using ECommons;
 using ECommons.LanguageHelpers;
+using Newtonsoft.Json;
 using Splatoon.SplatoonScripting;
 
 namespace Splatoon.Gui.Scripting;
@@ -11,6 +12,9 @@ internal static class TabScripting
     internal static volatile bool ForceUpdate = false;
     internal static string Search = "";
     internal static string RequestOpen = null;
+    private const int ScriptConfigUndoLimit = 10;
+    private const float ScriptConfigUndoIdleSeconds = 0.4f;
+    private static readonly Dictionary<string, ScriptConfigUndoState> ScriptConfigUndoStates = [];
     internal static void Draw()
     {
         if(ImGui.IsWindowAppearing()) RequestOpen = null;
@@ -355,6 +359,7 @@ internal static class TabScripting
             ImGuiEx.EzTabBar($"##scriptConfig",
                 (openConfig.InternalData.SettingsPresent ? "Configuration" : null, () =>
                 {
+                    HandleScriptConfigHotkeys(openConfig);
                     try
                     {
                         openConfig.OnSettingsDraw();
@@ -362,6 +367,10 @@ internal static class TabScripting
                     catch(Exception ex)
                     {
                         ex.Log();
+                    }
+                    finally
+                    {
+                        UpdateScriptConfigUndo(openConfig);
                     }
                 }, null, false),
                 (openConfig.Controller.GetRegisteredElements().Count > 0 ? "Registered elements" : null, openConfig.DrawRegisteredElements, null, false),
@@ -377,5 +386,167 @@ internal static class TabScripting
                 }
             });
         }
+    }
+
+    private static ScriptConfigUndoState GetScriptConfigUndoState(SplatoonScript script)
+    {
+        var key = script.InternalData.FullName;
+        if(!ScriptConfigUndoStates.TryGetValue(key, out var state))
+        {
+            state = new ScriptConfigUndoState();
+            ScriptConfigUndoStates[key] = state;
+        }
+        if(state.ScriptGuid != script.InternalData.GUID || state.ConfigKey != script.InternalData.CurrentConfigurationKey)
+        {
+            ResetScriptConfigUndoState(state, script);
+        }
+        return state;
+    }
+
+    private static void ResetScriptConfigUndoState(ScriptConfigUndoState state, SplatoonScript script)
+    {
+        state.ScriptGuid = script.InternalData.GUID;
+        state.ConfigKey = script.InternalData.CurrentConfigurationKey;
+        state.Undo.Clear();
+        state.Redo.Clear();
+        state.LastCommittedJson = null;
+        state.LastObservedJson = null;
+        state.LastObservedTime = 0;
+        state.IsApplying = false;
+    }
+
+    private static void HandleScriptConfigHotkeys(SplatoonScript script)
+    {
+        var state = GetScriptConfigUndoState(script);
+        if(state.IsApplying) return;
+        var io = ImGui.GetIO();
+        if(io.WantTextInput) return;
+        if(io.KeyCtrl)
+        {
+            if(io.KeyShift && ImGui.IsKeyPressed(ImGuiKey.Z, false))
+            {
+                RedoScriptConfigEdit(script, state);
+                return;
+            }
+            if(ImGui.IsKeyPressed(ImGuiKey.Z, false))
+            {
+                UndoScriptConfigEdit(script, state);
+                return;
+            }
+            if(ImGui.IsKeyPressed(ImGuiKey.Y, false))
+            {
+                RedoScriptConfigEdit(script, state);
+            }
+        }
+    }
+
+    private static void UpdateScriptConfigUndo(SplatoonScript script)
+    {
+        var state = GetScriptConfigUndoState(script);
+        if(state.IsApplying) return;
+        var config = script.Controller.Configuration;
+        if(config == null) return;
+        string currentJson;
+        try
+        {
+            currentJson = JsonConvert.SerializeObject(config);
+        }
+        catch(Exception ex)
+        {
+            ex.Log();
+            return;
+        }
+        var now = ImGui.GetTime();
+        if(state.Undo.Count == 0)
+        {
+            state.Undo.Add(currentJson);
+            state.LastCommittedJson = currentJson;
+            state.LastObservedJson = currentJson;
+            state.LastObservedTime = now;
+            return;
+        }
+        if(state.LastObservedJson != currentJson)
+        {
+            state.LastObservedJson = currentJson;
+            state.LastObservedTime = now;
+        }
+        if(state.LastCommittedJson != currentJson && now - state.LastObservedTime >= ScriptConfigUndoIdleSeconds)
+        {
+            PushScriptConfigUndo(state, currentJson);
+            state.Redo.Clear();
+        }
+    }
+
+    private static void PushScriptConfigUndo(ScriptConfigUndoState state, string json)
+    {
+        if(state.Undo.Count > 0 && state.Undo[^1] == json) return;
+        state.Undo.Add(json);
+        state.LastCommittedJson = json;
+        TrimScriptConfigUndo(state);
+    }
+
+    private static void TrimScriptConfigUndo(ScriptConfigUndoState state)
+    {
+        while(state.Undo.Count > ScriptConfigUndoLimit + 1)
+        {
+            state.Undo.RemoveAt(0);
+        }
+    }
+
+    private static bool CanUndoScriptConfig(ScriptConfigUndoState state) => state.Undo.Count > 1;
+    private static bool CanRedoScriptConfig(ScriptConfigUndoState state) => state.Redo.Count > 0;
+
+    private static void UndoScriptConfigEdit(SplatoonScript script, ScriptConfigUndoState state)
+    {
+        if(!CanUndoScriptConfig(state)) return;
+        if(script.Controller.Configuration == null) return;
+        var current = state.Undo[^1];
+        state.Undo.RemoveAt(state.Undo.Count - 1);
+        state.Redo.Add(current);
+        ApplyScriptConfigSnapshot(script, state, state.Undo[^1]);
+    }
+
+    private static void RedoScriptConfigEdit(SplatoonScript script, ScriptConfigUndoState state)
+    {
+        if(!CanRedoScriptConfig(state)) return;
+        if(script.Controller.Configuration == null) return;
+        var snapshot = state.Redo[^1];
+        state.Redo.RemoveAt(state.Redo.Count - 1);
+        state.Undo.Add(snapshot);
+        ApplyScriptConfigSnapshot(script, state, snapshot);
+    }
+
+    private static void ApplyScriptConfigSnapshot(SplatoonScript script, ScriptConfigUndoState state, string json)
+    {
+        var config = script.Controller.Configuration;
+        if(config == null) return;
+        state.IsApplying = true;
+        try
+        {
+            JsonConvert.PopulateObject(json, config);
+        }
+        catch(Exception ex)
+        {
+            ex.Log();
+        }
+        finally
+        {
+            state.IsApplying = false;
+        }
+        state.LastCommittedJson = json;
+        state.LastObservedJson = json;
+        state.LastObservedTime = ImGui.GetTime();
+    }
+
+    private class ScriptConfigUndoState
+    {
+        public string ScriptGuid;
+        public string ConfigKey;
+        public readonly List<string> Undo = [];
+        public readonly List<string> Redo = [];
+        public string LastCommittedJson;
+        public string LastObservedJson;
+        public double LastObservedTime;
+        public bool IsApplying;
     }
 }

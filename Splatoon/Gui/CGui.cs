@@ -42,6 +42,7 @@ internal unsafe partial class CGui : IDisposable
     private bool WasOpen = false;
     private float RightWidth = 0;
     internal string TabRequest = null;
+    internal string ToolsTabRequest = null;
 
     public CGui(Splatoon p)
     {
@@ -161,7 +162,8 @@ internal unsafe partial class CGui : IDisposable
                         ("Projection".Loc(), TabProjection.Draw, EColor.CyanBright, true),
                         ("Tools".Loc(), delegate
                         {
-                            ImGuiEx.EzTabBar("Tools",
+                            var toolsTabRequest = ToolsTabRequest;
+                            ImGuiEx.EzTabBar("Tools", null, toolsTabRequest,
                             ("Mass Import".Loc(), RapidImport.Draw, null, true),
                             ("Translator".Loc(), TabTranslator.Draw, null, true),
                             ("Logger".Loc(), DisplayLogger, null, true),
@@ -174,6 +176,7 @@ internal unsafe partial class CGui : IDisposable
                             ("Dynamic".Loc(), DisplayDynamicElements, null, true),
                             ("Trusted Repos".Loc(), TabTrustedRepos.Draw, null, true)
                             );
+                            if(ToolsTabRequest == toolsTabRequest) ToolsTabRequest = null;
                         }, null, true),
                         ("Contribute".Loc(), Contribute.Draw, null, true)
                         //("Contributors".Loc(), TabContributors.Draw, null, true)

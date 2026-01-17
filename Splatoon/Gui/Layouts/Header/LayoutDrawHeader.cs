@@ -230,6 +230,7 @@ New frozen elements are created every refreeze interval.".Loc());
                 if(ImGuiEx.IconButtonWithText(FontAwesomeIcon.Plus, "Add".Loc()))
                 {
                     layout.Triggers.Add(new Trigger());
+                    MarkLayoutEdited();
                 }
                 if(ImGuiEx.IconButtonWithText(FontAwesomeIcon.Copy, "Copy".Loc()))
                 {
@@ -240,6 +241,7 @@ New frozen elements are created every refreeze interval.".Loc());
                     try
                     {
                         layout.Triggers = JsonConvert.DeserializeObject<List<Trigger>>(ImGui.GetClipboardText());
+                        MarkLayoutEdited();
                     }
                     catch(Exception e)
                     {
@@ -259,6 +261,7 @@ New frozen elements are created every refreeze interval.".Loc());
                         {
                             layout.Triggers.Add(t);
                         }
+                        MarkLayoutEdited();
                     }
                     catch(Exception e)
                     {
@@ -332,6 +335,7 @@ New frozen elements are created every refreeze interval.".Loc());
                         if(ImGui.Selectable(ExcelActionHelper.GetActionName(x.Descriptor.Id, true), actions.Contains(x.Descriptor.Id), ImGuiSelectableFlags.DontClosePopups))
                         {
                             actions.Toggle(x.Descriptor.Id);
+                            P.ConfigGui.MarkLayoutEdited();
                         }
                     }
                 }
@@ -346,6 +350,7 @@ New frozen elements are created every refreeze interval.".Loc());
                         if(ImGui.Selectable(ExcelActionHelper.GetActionName(x, true), actions.Contains(x), ImGuiSelectableFlags.DontClosePopups))
                         {
                             actions.Toggle(x);
+                            P.ConfigGui.MarkLayoutEdited();
                         }
                     }
                 }

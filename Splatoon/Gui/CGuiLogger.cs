@@ -74,6 +74,7 @@ internal partial class CGui
                 if(Svc.Objects.TryGetFirst(z => z.EntityId == x.Key.EntityId, out var go))
                 {
                     Explorer.Ptr = go.Address;
+                    ToolsTabRequest = "Explorer".Loc();
                 }
             }
             ImGui.SameLine();

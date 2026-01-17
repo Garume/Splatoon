@@ -58,13 +58,13 @@ internal unsafe partial class CGui
             p.Clipboard = JsonConvert.DeserializeObject<Element>(JsonConvert.SerializeObject(el));
         }
         ImGuiEx.Tooltip("Copy style");
-        if(p.Clipboard != null)
-        {
-            ImGui.SameLine();
-            if(ImGuiEx.IconButton(FontAwesomeIcon.FillDrip))
+            if(p.Clipboard != null)
             {
-                el.color = p.Clipboard.color;
-                el.thicc = p.Clipboard.thicc;
+                ImGui.SameLine();
+                if(ImGuiEx.IconButton(FontAwesomeIcon.FillDrip))
+                {
+                    el.color = p.Clipboard.color;
+                    el.thicc = p.Clipboard.thicc;
 
                 if(p.Clipboard.Filled)
                 {
@@ -107,6 +107,7 @@ internal unsafe partial class CGui
                     el.refY = p.Clipboard.refY;
                     el.refZ = p.Clipboard.refZ;
                 }
+                MarkLayoutEdited();
             }
             if(ImGui.IsItemHovered())
             {
@@ -199,6 +200,7 @@ internal unsafe partial class CGui
             el.refX = point.X;
             el.refY = point.Z;
             el.refZ = point.Y;
+            MarkLayoutEdited();
         }
         ImGuiEx.Tooltip($"Rotate {RotationAngle} degrees clockwise");
         ImGui.SameLine();
@@ -208,6 +210,7 @@ internal unsafe partial class CGui
             el.refX = point.X;
             el.refY = point.Z;
             el.refZ = point.Y;
+            MarkLayoutEdited();
         }
         ImGuiEx.Tooltip($"Rotate {RotationAngle} degrees counter-clockwise");
 

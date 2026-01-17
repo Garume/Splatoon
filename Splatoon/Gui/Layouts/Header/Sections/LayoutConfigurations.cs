@@ -41,6 +41,7 @@ internal static class LayoutConfigurations
                     if(ImGui.Selectable(layout.DefaultConfigurationName.NullWhenEmpty() ?? $"Default Configuration", selectedConf == null))
                     {
                         layout.SelectedSubconfigurationID = Guid.Empty;
+                        P.ConfigGui.MarkLayoutEdited();
                     }
                     ImGui.Separator();
                     DragDrop.Begin();
@@ -58,6 +59,7 @@ internal static class LayoutConfigurations
                         if(ImGui.Selectable($"{conf.GetName(layout)}##{conf.Guid}", col || conf.Guid == selectedConf?.Guid))
                         {
                             layout.SelectedSubconfigurationID = conf.Guid;
+                            P.ConfigGui.MarkLayoutEdited();
                         }
                         if(col) ImGui.PopStyleColor();
                     }
@@ -75,6 +77,7 @@ internal static class LayoutConfigurations
                             };
                             layout.Subconfigurations.Add(newConf);
                             layout.SelectedSubconfigurationID = newConf.Guid;
+                            P.ConfigGui.MarkLayoutEdited();
                         }
                         if(selectedConf != null)
                         {
@@ -99,6 +102,7 @@ internal static class LayoutConfigurations
                                 }
                                 layout.Subconfigurations.Add(newConf);
                                 layout.SelectedSubconfigurationID = newConf.Guid;
+                                P.ConfigGui.MarkLayoutEdited();
                             }
                         }
                     }
@@ -111,6 +115,7 @@ internal static class LayoutConfigurations
                     if(ImGuiEx.IconButton(FontAwesomeIcon.Trash, enabled: ImGuiEx.Ctrl && selectedConf != null))
                     {
                         new TickScheduler(() => layout.Subconfigurations.Remove(selectedConf));
+                        P.ConfigGui.MarkLayoutEdited();
                     }
                     ImGuiEx.Tooltip(selectedConf == null ? "Default Configuration can not be removed" : "Hold CTRL and click to remove configuration");
                 }

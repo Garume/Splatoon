@@ -25,6 +25,7 @@ internal static class Triggers
                 if(ImGuiEx.IconButton(FontAwesomeIcon.Trash, enabled: ImGuiEx.Ctrl))
                 {
                     new TickScheduler(() => layout.Triggers.Remove(trigger));
+                    P.ConfigGui.MarkLayoutEdited();
                 }
                 ImGuiEx.Tooltip("Hold CTRL + left click to delete".Loc());
                 ImGui.SameLine(0, 1);

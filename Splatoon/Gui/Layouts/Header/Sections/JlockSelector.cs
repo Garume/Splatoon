@@ -27,6 +27,9 @@ internal static class JlockSelector
             ImGui.SameLine();
         }
         ImGuiEx.SetNextItemFullWidth();
-        ImGuiEx.JobSelector("##jobSelector", layout.JobLockH, [ImGuiEx.JobSelectorOption.BulkSelectors, ImGuiEx.JobSelectorOption.IncludeBase], 7, "All Jobs");
+        if(ImGuiEx.JobSelector("##jobSelector", layout.JobLockH, [ImGuiEx.JobSelectorOption.BulkSelectors, ImGuiEx.JobSelectorOption.IncludeBase], 7, "All Jobs"))
+        {
+            P.ConfigGui.MarkLayoutEdited();
+        }
     }
 }

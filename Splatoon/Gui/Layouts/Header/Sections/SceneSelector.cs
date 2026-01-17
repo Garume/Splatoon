@@ -20,6 +20,7 @@ namespace Splatoon.Gui.Layouts.Header.Sections
                 if(ImGui.Button("Add"))
                 {
                     l.Scenes.Add(NewScene);
+                    P.ConfigGui.MarkLayoutEdited();
                 }
                 var toRem = -1;
                 foreach(var sc in l.Scenes)
@@ -34,6 +35,7 @@ namespace Splatoon.Gui.Layouts.Header.Sections
                 if(toRem > -1)
                 {
                     l.Scenes.Remove(toRem);
+                    P.ConfigGui.MarkLayoutEdited();
                 }
                 ImGui.EndCombo();
             }

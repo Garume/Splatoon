@@ -37,6 +37,7 @@ internal static class ZlockSelector
                 if(P.Zones.ContainsKey(Svc.ClientState.TerritoryType) && ImGui.SmallButton($"Current zone: ??".Loc(GenericHelpers.GetTerritoryName(Svc.ClientState.TerritoryType))))
                 {
                     layout.ZoneLockH.Toggle(Svc.ClientState.TerritoryType);
+                    P.ConfigGui.MarkLayoutEdited();
                 }
                 ImGuiUtils.UncolorButton();
                 ImGui.PopStyleColor();
@@ -53,6 +54,7 @@ internal static class ZlockSelector
                 if(ImGui.SmallButton(s))
                 {
                     layout.ZoneLockH.Toggle(z.Key);
+                    P.ConfigGui.MarkLayoutEdited();
                 }
                 ImGuiUtils.UncolorButton();
             }
